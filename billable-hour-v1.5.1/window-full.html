@@ -4,55 +4,72 @@
   <meta charset="utf-8" />
   <title>Billable Hour Machine</title>
   <link rel="stylesheet" href="window-full.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-
   <div id="title" class="pixel-font">Billable Hour Machine!</div>
+
   <div id="unitLengthControl" class="pixel-font-small">
-    Unit Length: <input id="unitLengthInput" type="number" min="1" max="30" value="6" style="width:40px;"> minutes
+    Unit Length:
+    <input id="unitLengthInput" type="number" min="1" max="30" value="6" />
+    minutes
   </div>
 
   <div id="dateLine" class="pixel-font">--</div>
-
   <div id="currentTime" class="pixel-font">--</div>
-
   <div id="unitDisplay" class="pixel-font">Idle</div>
 
-  <button id="startStopButton">
+  <button id="startStopButton" aria-label="Start or stop timer">
     <div id="overlay"></div>
   </button>
+
+  <div class="timerControls">
+    <button id="pauseResumeButton" disabled>Pause</button>
+  </div>
+
+  <section id="milestonePanel" class="panel">
+    <div class="panelTitle pixel-font-small">Annual Milestone</div>
+    <div class="milestoneInputs">
+      <label>
+        Target annual billable hours
+        <input id="targetHoursInput" type="number" min="0" step="0.1" placeholder="1800" />
+      </label>
+      <label>
+        Current completed hours
+        <input id="startingHoursInput" type="number" min="0" step="0.1" placeholder="0" />
+      </label>
+    </div>
+    <div id="milestoneSummary" class="milestoneSummary pixel-font-small"></div>
+  </section>
 
   <div id="lastSessionTitle" class="pixel-font-small">Last Session</div>
   <div id="lastSessionInfo" class="sessionBox pixel-font-small"></div>
 
-  <button id="viewHistoryButton">📜 Show All Worklog </button>
+  <button id="viewHistoryButton">Show All Worklog</button>
 
   <div id="historyArea" style="display:none;">
     <div id="historyDisplay" class="scrollableArea pixel-font-small"></div>
   </div>
 
-  <button id="clearHistoryButton">🗑️ Clean All Worklog</button>
+  <button id="clearHistoryButton">Clean All Worklog</button>
 
-  <!-- Modal for Client/Notes -->
   <div id="inputModal" class="modal" style="display:none;">
     <div class="modal-content">
-        <label>Client / Project ID:</label><br/>
-        <input type="text" id="clientInput" /><br/><br/>
-        <label>Notes:</label><br/>
-        <input type="text" id="notesInput" /><br/><br/>
-        <button id="confirmSaveButton">Confirm & Save</button>
+      <label for="clientInput">Client / Project ID:</label><br />
+      <input type="text" id="clientInput" /><br /><br />
+      <label for="notesInput">Notes:</label><br />
+      <input type="text" id="notesInput" /><br /><br />
+      <button id="confirmSaveButton">Confirm & Save</button>
     </div>
   </div>
 
-
   <div class="footer-suggestion pixel-font-small">
-    <a href="https://paypal.me/YPeng825/4" target="_blank">☕ Buy Me a Coffee</a>
-    <span style="margin: 0 10px;">|</span>
-    <a href="https://github.com/yifengp/billable_hour_machine/issues" target="_blank">💬 Feedback</a>
+    <a href="https://paypal.me/YPeng825/4" target="_blank">Buy Me a Coffee</a>
+    <span>|</span>
+    <a href="https://github.com/yifengp/billable_hour_machine/issues" target="_blank">Feedback</a>
   </div>
 
+  <script src="src/timer.js"></script>
+  <script src="src/milestone.js"></script>
   <script src="window-full.js"></script>
-
 </body>
 </html>

@@ -1,20 +1,22 @@
-html, body {
+html,
+body {
   width: 420px;
-  height: 630px;
+  min-height: 720px;
   margin: 0;
   padding: 0;
-  background-color: #E2E2D7;
+  background-color: #e2e2d7;
   color: #000;
-  font-family: 'Press Start 2P', Arial, sans-serif;
+  font-family: "Courier New", monospace;
   text-align: center;
 }
 
-.pixel-font {
-  font-family: 'Press Start 2P', Arial, sans-serif;
+.pixel-font,
+.pixel-font-small,
+button {
+  font-family: "Courier New", monospace;
 }
 
 .pixel-font-small {
-  font-family: 'Press Start 2P', Arial, sans-serif;
   font-size: 10px;
 }
 
@@ -22,11 +24,6 @@ html, body {
   margin-top: 10px;
   font-size: 16px;
   font-weight: bold;
-}
-
-#comment {
-  margin-top: 8px;
-  font-size: 10px;
 }
 
 #dateLine {
@@ -37,19 +34,40 @@ html, body {
 #currentTime {
   margin-top: 8px;
   font-size: 20px;
+  font-weight: 700;
 }
 
 #unitDisplay {
-  margin-top: 12px;
+  margin: 12px auto 0 auto;
   font-size: 14px;
   padding: 8px;
   background-color: #fffacd;
   border-radius: 8px;
   color: #000;
-  width: 90%;           /* 新增：宽度与按钮一致 */
-  margin-left: auto;    /* 新增：居中 */
-  margin-right: auto;   /* 新增：居中 */
+  width: 90%;
   box-sizing: border-box;
+}
+
+#unitLengthControl {
+  margin: 10px auto 0 auto;
+  font-size: 12px;
+  color: #333;
+  width: 90%;
+}
+
+#unitLengthInput,
+#targetHoursInput,
+#startingHoursInput {
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #aaa;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+#unitLengthInput {
+  width: 48px;
 }
 
 #startStopButton {
@@ -60,11 +78,15 @@ html, body {
   background-color: transparent;
   border: none;
   border-radius: 12px;
-  width: 160px;
-  height: 160px;
+  width: 150px;
+  height: 150px;
   cursor: pointer;
-  transition: transform 0.1s ease, opacity 0.1s ease;
+  transition: transform 0.1s ease, opacity 0.1s ease, filter 0.2s ease;
   position: relative;
+}
+
+#startStopButton.is-paused {
+  filter: grayscale(0.75) contrast(0.9);
 }
 
 #startStopButton:active {
@@ -78,8 +100,8 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(255, 255, 255, 0.8);
-  color: #4CAF50;
+  background-color: rgba(255, 255, 255, 0.82);
+  color: #2f6f3e;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,31 +113,109 @@ html, body {
   transition: opacity 0.3s ease;
 }
 
-#lastSessionTitle {
-  margin-top: 14px;
+.timerControls {
+  margin-top: 8px;
 }
 
-#lastSessionInfo {
+button {
+  background-color: #fff;
+  border: 2px solid #fff;
+  padding: 7px 10px;
+  width: 90%;
+  border-radius: 8px;
+  font-size: 10px;
+  cursor: pointer;
+  color: #000;
+}
+
+button:hover:not(:disabled) {
+  background-color: #e6ffe6;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+#pauseResumeButton {
+  width: 52%;
+  background-color: #f4f7ff;
+  border-color: #d8e1ff;
+}
+
+.panel {
+  width: 90%;
+  margin: 12px auto 10px auto;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.panelTitle {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.milestoneInputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  text-align: left;
+}
+
+.milestoneInputs label {
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.milestoneInputs input {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.milestoneSummary {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  text-align: left;
+}
+
+.milestoneSummary div {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 5px;
+  background: #fbfbf6;
+}
+
+.milestoneSummary .full {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-weight: 700;
+  background: #eef9ee;
+}
+
+#lastSessionTitle {
+  margin-top: 12px;
+}
+
+#lastSessionInfo,
+#historyDisplay {
   margin-top: 6px;
   font-size: 10px;
   color: #000;
-  background-color: #ffffff;
-  border-radius: 12px;
-  padding: 12px;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 10px;
   text-align: center;
 }
 
 #historyDisplay {
-  margin-top: 10px;
-  font-size: 10px;
-  color: #000000;
   max-height: 160px;
   overflow-y: auto;
   white-space: pre-wrap;
-  background-color: #ffffff;
-  border-radius: 12px;
-  padding: 12px;
-  text-align: center;
 }
 
 .scrollableArea {
@@ -125,35 +225,12 @@ html, body {
 
 #viewHistoryButton {
   margin-top: 10px;
-  background-color: #ffffff;
-  border: 2px solid #ffffff;
-  padding: 6px 10px;
-  width: 90%;
-  border-radius: 8px;
-  font-size: 10px;
-  cursor: pointer;
-  color: #000;
-  font-family: 'Press Start 2P', Arial, sans-serif;
-
-}
-
-#viewHistoryButton:hover {
-  background-color: #e6ffe6;
-
 }
 
 #clearHistoryButton {
-  margin-top: 16px;
+  margin-top: 10px;
   background-color: #ffdddd;
-  border: 2px solid #ffdddd;
-  padding: 6px 10px;
-  width: 90%;
-  border-radius: 8px;
-  font-size: 10px;
-  cursor: pointer;
-  color: #000;
-  font-family: 'Press Start 2P', Arial, sans-serif;
-
+  border-color: #ffdddd;
 }
 
 #clearHistoryButton:hover {
@@ -162,9 +239,11 @@ html, body {
 
 .modal {
   position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background-color: rgba(0,0,0,0.5);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -174,54 +253,44 @@ html, body {
 .modal-content {
   background-color: #fff;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 8px;
   width: 300px;
   color: #000;
   font-family: Arial, sans-serif;
   text-align: center;
 }
+
 .modal-content input {
   width: 90%;
   padding: 6px;
   margin-top: 4px;
 }
-#unitLengthControl {
-  margin: 10px auto 0 auto;
-  font-size: 12px;
-  color: #333;
-  width: 90%;
-  text-align: center;
-}
-#unitLengthInput {
-  font-size: 12px;
-  padding: 2px 4px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  width: 40px;
-  text-align: center;
-}
+
 .session-table {
   margin: 0 auto 5px auto;
   border-collapse: collapse;
-  width: 90%;           
+  width: 90%;
   background: #fff;
 }
+
 .session-table td {
   border: 1px solid #ccc;
-  padding: 6px 10px;
+  padding: 6px 8px;
   text-align: center;
-  font-family: 'Press Start 2P', monospace;
+  font-family: "Courier New", monospace;
   font-size: 10px;
+  overflow-wrap: anywhere;
 }
+
 .session-key {
   font-weight: bold;
   background: #f7f7f7;
-  width: 40%;
-  font-size: 14px;
+  width: 42%;
   color: #222;
 }
+
 .session-value {
-  width: 60%;
+  width: 58%;
 }
 
 .sessionBox,
@@ -229,10 +298,10 @@ html, body {
   width: 90%;
   margin: 0 auto 10px auto;
   background: #fff;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 10px;
   box-sizing: border-box;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 .current-session-table {
@@ -242,21 +311,19 @@ html, body {
 .footer-suggestion {
   font-size: 10px;
   color: #666;
-  margin-top: 10px;
+  margin: 10px 0 12px 0;
   text-align: center;
 }
 
-.footer-links {
-  margin: 8px auto 0 auto;
-  text-align: center;
-  font-size: 12px;
+.footer-suggestion span {
+  margin: 0 10px;
 }
-.footer-links a {
+
+.footer-suggestion a {
   color: #0077cc;
   text-decoration: none;
-  font-size: 12px;
-  margin: 0 4px;
 }
-.footer-links a:hover {
+
+.footer-suggestion a:hover {
   text-decoration: underline;
 }

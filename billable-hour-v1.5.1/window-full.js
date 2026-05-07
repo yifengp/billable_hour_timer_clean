@@ -1,276 +1,491 @@
-// extra function: order of the session ---added
-// extra function: show date of the time --added
-// extra change the icon of running period --added
-// extra function: enlarge the start and end button --added
-// extra function： focus on the icon and instead of the head of the page 
-// adjust the time unit to 6 minutes
-
 (function() {
-  // 变量区：所有 let/const 声明的地方，通常在函数(function(){...})的最上方
-  const iconURL = chrome.runtime.getURL('icon1.png'); // 待机图片
-  const iconCountingURL = chrome.runtime.getURL('icon2.png'); // 计时图片
-  const modal = document.getElementById('inputModal');
-  const clientInput = document.getElementById('clientInput');
-  const notesInput = document.getElementById('notesInput');
-  const confirmSaveButton = document.getElementById('confirmSaveButton');
+  const STORAGE_KEYS = {
+    unitLength: 'unitLength',
+    history: 'floating_counter_history',
+    milestone: 'billable_milestone_settings'
+  };
 
-  const startStopButton = document.getElementById('startStopButton');
-  startStopButton.style.backgroundImage = `url('${iconURL}')`;
+  const iconURL = chrome.runtime.getURL('icon1.png');
+  const iconCountingURL = chrome.runtime.getURL('icon2.png');
 
-  let timer = null;
-  let startTime = null;
-  let unitCount = 1;
+  const timerTools = window.BillableTimer;
+  const milestoneTools = window.BillableMilestone;
+
+  const elements = {
+    unitLengthInput: document.getElementById('unitLengthInput'),
+    dateLine: document.getElementById('dateLine'),
+    currentTime: document.getElementById('currentTime'),
+    unitDisplay: document.getElementById('unitDisplay'),
+    startStopButton: document.getElementById('startStopButton'),
+    pauseResumeButton: document.getElementById('pauseResumeButton'),
+    overlay: document.getElementById('overlay'),
+    lastSessionTitle: document.getElementById('lastSessionTitle'),
+    lastSessionInfo: document.getElementById('lastSessionInfo'),
+    viewHistoryButton: document.getElementById('viewHistoryButton'),
+    historyArea: document.getElementById('historyArea'),
+    historyDisplay: document.getElementById('historyDisplay'),
+    clearHistoryButton: document.getElementById('clearHistoryButton'),
+    modal: document.getElementById('inputModal'),
+    clientInput: document.getElementById('clientInput'),
+    notesInput: document.getElementById('notesInput'),
+    confirmSaveButton: document.getElementById('confirmSaveButton'),
+    targetHoursInput: document.getElementById('targetHoursInput'),
+    startingHoursInput: document.getElementById('startingHoursInput'),
+    milestoneSummary: document.getElementById('milestoneSummary')
+  };
+
+  let timerInterval = null;
+  let clockInterval = null;
+  let timerState = timerTools.createTimerState(Date.now());
+  let unitLength = 6;
   let sessionHistory = [];
-  let sessionIndex = 1; // 新增：记录序号
-  let unitLength = 6; // 新增：unit时长，默认6分钟
+  let sessionIndex = 1;
+  let pendingSession = null;
+  let milestoneSettings = {
+    targetHours: '',
+    startingHours: ''
+  };
 
-  // 读取本地存储的unitLength
-  chrome.storage.local.get(['unitLength'], (result) => {
-    if (result.unitLength) {
-      unitLength = result.unitLength;
-      const input = document.getElementById('unitLengthInput');
-      if (input) input.value = unitLength;
-    }
-  });
+  init();
 
-  // 监听输入框变化
-  document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('unitLengthInput');
-    if (input) {
-      input.addEventListener('change', (e) => {
-        let val = parseInt(e.target.value, 10);
-        if (isNaN(val) || val < 1) val = 1;
-        if (val > 30) val = 30;
-        unitLength = val;
-        input.value = unitLength;
-        chrome.storage.local.set({ unitLength: unitLength });
-      });
-    }
-  });
-
-  startClock();
-
-  // 新增：初始化序号
-  function initSessionIndex() {
-    chrome.storage.local.get(['floating_counter_history'], (result) => {
-      if (result.floating_counter_history) {
-        const records = result.floating_counter_history.split('=====\n').filter(s => s.trim().length > 0);
-        sessionIndex = records.length + 1;
-      } else {
-        sessionIndex = 1;
-      }
-    });
-  }
-  initSessionIndex();
-
-  startStopButton.addEventListener('click', () => {
-    if (!timer) {
-      startTime = new Date();
-      timer = setInterval(updateUnits, 60000);
-      showOverlay('Start!', { fontSize: '32px', fontWeight: '900' }); // 高亮大字
-      unitCount = 1;
-      document.getElementById('unitDisplay').innerText = `Running: ${unitCount} Units`;
-      document.getElementById('unitDisplay').style.display = 'block';
-      showCurrentSessionTable(startTime, unitCount); // 新增
-      document.getElementById('lastSessionTitle').innerText = 'Current Session'; // 新增
-      startStopButton.style.backgroundImage = `url('${iconCountingURL}')`; // 计时图片
-    } else {
-      clearInterval(timer);
-      timer = null;
-      // Show modal first instead of saving immediately:
-      modal.style.display = 'flex';
-      startStopButton.style.backgroundImage = `url('${iconURL}')`; // 恢复待机图片
-      showOverlay('End', { fontSize: '32px', fontWeight: '900' }); // 高亮大字
-    }
-  });
-
-  function updateUnits() {
-    const elapsedMs = new Date() - startTime;
-    const elapsedMinutes = Math.floor(elapsedMs / 60000);
-    unitCount = Math.max(1, Math.floor(elapsedMinutes / unitLength) + 1); // 用unitLength
-    document.getElementById('unitDisplay').innerText = `Running: ${unitCount} Units`;
-    if (timer) {
-    showCurrentSessionTable(startTime, unitCount);
-    }
+  function init() {
+    elements.startStopButton.style.backgroundImage = `url('${iconURL}')`;
+    bindEvents();
+    startClock();
+    restoreSettingsAndHistory();
   }
 
-  function showOverlay(text, options = {}) {
-    const overlay = document.getElementById('overlay');
-    overlay.innerText = text;
-    // 新增：可选自定义字体大小和加粗
-    if (options.fontSize) {
-      overlay.style.fontSize = options.fontSize;
-    } else {
-      overlay.style.fontSize = '18px'; // 默认
-    }
-    if (options.fontWeight) {
-      overlay.style.fontWeight = options.fontWeight;
-    } else {
-      overlay.style.fontWeight = 'bold';
-    }
-    overlay.style.opacity = '1';
-    setTimeout(() => {
-      overlay.style.opacity = '0';
-      // 恢复默认
-      overlay.style.fontSize = '18px';
-      overlay.style.fontWeight = 'bold';
-    }, 800);
+  function bindEvents() {
+    elements.unitLengthInput.addEventListener('change', handleUnitLengthChange);
+    elements.startStopButton.addEventListener('click', handleStartStopClick);
+    elements.pauseResumeButton.addEventListener('click', handlePauseResumeClick);
+    elements.confirmSaveButton.addEventListener('click', handleConfirmSave);
+    elements.viewHistoryButton.addEventListener('click', handleToggleHistory);
+    elements.clearHistoryButton.addEventListener('click', handleClearHistory);
+    elements.targetHoursInput.addEventListener('change', handleMilestoneChange);
+    elements.startingHoursInput.addEventListener('change', handleMilestoneChange);
   }
 
   function startClock() {
     updateClock();
-    setInterval(updateClock, 1000);
-    restoreHistory();
+    clockInterval = setInterval(updateClock, 1000);
   }
 
   function updateClock() {
     const now = new Date();
-    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const day = dayNames[now.getDay()];
-    const dateStr = `${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getDate().toString().padStart(2,'0')}/${now.getFullYear()}`;
-    const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
-    document.getElementById('dateLine').innerText = `${day} ${dateStr}`;
-    document.getElementById('currentTime').innerText = `${timeStr}`;
+    const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    elements.dateLine.textContent = `${day} ${dateStr}`;
+    elements.currentTime.textContent = timeStr;
   }
 
-  function recordToTable(record) {
-    const lines = record.replace(/={2,}/g, '').trim().split('\n');
-    let html = '<table class="session-table"><tbody>';
-    lines.forEach(line => {
-      const [key, ...rest] = line.split(':');
-      if (rest.length > 0) {
-      let keyClass = "session-key";
-      if (key.trim() === "Start") keyClass += " start-key";
-      if (key.trim() === "End") keyClass += " end-key";
-      html += `<tr><td class="${keyClass}">${key.trim()}</td><td class="session-value">${rest.join(':').trim()}</td></tr>`;
+  function restoreSettingsAndHistory() {
+    chrome.storage.local.get([STORAGE_KEYS.unitLength, STORAGE_KEYS.history, STORAGE_KEYS.milestone], (result) => {
+      unitLength = clampUnitLength(result[STORAGE_KEYS.unitLength] || 6);
+      elements.unitLengthInput.value = unitLength;
+
+      sessionHistory = parseHistory(result[STORAGE_KEYS.history] || '');
+      sessionIndex = sessionHistory.length + 1;
+
+      milestoneSettings = {
+        targetHours: result[STORAGE_KEYS.milestone]?.targetHours ?? '',
+        startingHours: result[STORAGE_KEYS.milestone]?.startingHours ?? ''
+      };
+      elements.targetHoursInput.value = milestoneSettings.targetHours;
+      elements.startingHoursInput.value = milestoneSettings.startingHours;
+
+      renderLastSession();
+      renderMilestone();
+    });
+  }
+
+  function handleUnitLengthChange(event) {
+    unitLength = clampUnitLength(event.target.value);
+    elements.unitLengthInput.value = unitLength;
+    chrome.storage.local.set({ [STORAGE_KEYS.unitLength]: unitLength });
+    renderCurrentSession();
+    renderMilestone();
+  }
+
+  function handleStartStopClick() {
+    if (timerState.status === 'idle') {
+      startSession();
+      return;
     }
-  });
-    html += '</tbody></table>';
-    return html;
+
+    if (timerState.status === 'running' || timerState.status === 'paused') {
+      stopSession();
+    }
   }
 
-  function updateLastSession(record) {
-    const lastBox = document.getElementById('lastSessionInfo');
-    lastBox.innerHTML = recordToTable(record);
+  function startSession() {
+    const now = new Date();
+    timerState = timerTools.startTimerState(now);
+    pendingSession = null;
+    startTimerInterval();
+    showOverlay('Start!', { fontSize: '32px', fontWeight: '900' });
+    elements.startStopButton.style.backgroundImage = `url('${iconCountingURL}')`;
+    elements.startStopButton.classList.remove('is-paused');
+    elements.pauseResumeButton.disabled = false;
+    elements.pauseResumeButton.textContent = 'Pause';
+    renderCurrentSession();
   }
 
-  function formatTimeWithDate(t) {
-    // concise: yyyy-MM-dd HH:mm:ss
-    return `${t.getFullYear()}-${(t.getMonth()+1).toString().padStart(2,'0')}-${t.getDate().toString().padStart(2,'0')} ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}:${t.getSeconds().toString().padStart(2,'0')}`;
+  function stopSession() {
+    const now = new Date();
+    timerState = timerTools.stopTimerState(timerState, now.getTime());
+    stopTimerInterval();
+
+    const activeElapsedMs = timerTools.getActiveElapsedMs(timerState, now.getTime());
+    const pausedElapsedMs = timerTools.getPausedElapsedMs(timerState, now.getTime());
+    const units = timerTools.getUnitCount(activeElapsedMs, unitLength);
+
+    pendingSession = {
+      startTime: timerState.startTime,
+      endTime: now,
+      units,
+      activeMinutes: timerTools.minutesFromMs(activeElapsedMs),
+      pausedMinutes: timerTools.minutesFromMs(pausedElapsedMs),
+      unitLength
+    };
+
+    elements.pauseResumeButton.disabled = true;
+    elements.pauseResumeButton.textContent = 'Pause';
+    elements.startStopButton.style.backgroundImage = `url('${iconURL}')`;
+    elements.startStopButton.classList.remove('is-paused');
+    elements.modal.style.display = 'flex';
+    showOverlay('End', { fontSize: '32px', fontWeight: '900' });
   }
 
-  function formatTimeWithMonthDay(t) {
-    // 紧凑格式 MM-dd HH:mm:ss
-    return `${(t.getMonth()+1).toString().padStart(2,'0')}-${t.getDate().toString().padStart(2,'0')} ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}:${t.getSeconds().toString().padStart(2,'0')}`;
+  function handlePauseResumeClick() {
+    const nowMs = Date.now();
+
+    if (timerState.status === 'running') {
+      timerState = timerTools.pauseTimerState(timerState, nowMs);
+      stopTimerInterval();
+      elements.pauseResumeButton.textContent = 'Resume';
+      elements.startStopButton.classList.add('is-paused');
+      showOverlay('Pause', { fontSize: '28px', fontWeight: '900' });
+      renderCurrentSession();
+      return;
+    }
+
+    if (timerState.status === 'paused') {
+      timerState = timerTools.resumeTimerState(timerState, nowMs);
+      startTimerInterval();
+      elements.pauseResumeButton.textContent = 'Pause';
+      elements.startStopButton.classList.remove('is-paused');
+      showOverlay('Resume', { fontSize: '24px', fontWeight: '900' });
+      renderCurrentSession();
+    }
   }
 
-  function saveSession(start, end, units, clientText, notesText) {
-    const startStr = formatTimeWithMonthDay(start); // 仅月日
-    const endStr = formatTimeWithMonthDay(end); // 仅月日
-    const todayDate = formatDate(start);
-    // 新增：加上序号
-    const record = `No. ${sessionIndex}\nStart: ${startStr}\nEnd: ${endStr}\nUnits: ${units}\nClient / Project ID: ${clientText}\nNotes: ${notesText}\n=====\n`;
+  function startTimerInterval() {
+    stopTimerInterval();
+    timerInterval = setInterval(renderCurrentSession, 1000);
+  }
 
-    chrome.storage.local.get(['floating_counter_history'], (result) => {
-      let history = result.floating_counter_history || '';
-      history += record;
-      sessionHistory.push(record);
-      chrome.storage.local.set({ floating_counter_history: history });
-      sessionIndex++; // 新增：每次保存后序号+1
+  function stopTimerInterval() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  function renderCurrentSession() {
+    if (timerState.status !== 'running' && timerState.status !== 'paused') return;
+
+    const nowMs = Date.now();
+    const activeMs = timerTools.getActiveElapsedMs(timerState, nowMs);
+    const pausedMs = timerTools.getPausedElapsedMs(timerState, nowMs);
+    const units = timerTools.getUnitCount(activeMs, unitLength);
+    const label = timerState.status === 'paused' ? 'Paused' : 'Running';
+
+    elements.unitDisplay.textContent = `${label}: ${units} Units`;
+    elements.unitDisplay.style.display = 'block';
+    elements.lastSessionTitle.textContent = 'Current Session';
+    renderTable(elements.lastSessionInfo, [
+      ['Start', formatTimeWithMonthDay(timerState.startTime)],
+      ['End', timerState.status === 'paused' ? 'Paused' : ''],
+      ['Units', String(units)],
+      ['Active Minutes', String(timerTools.minutesFromMs(activeMs))],
+      ['Paused Minutes', String(timerTools.minutesFromMs(pausedMs))]
+    ], true);
+  }
+
+  function handleConfirmSave() {
+    if (!pendingSession) return;
+
+    const clientText = elements.clientInput.value.trim();
+    const notesText = elements.notesInput.value.trim();
+    const record = buildSessionRecord(pendingSession, clientText, notesText);
+
+    saveSessionRecord(record, (allHistory) => {
+      renderLastSession(record);
+      downloadHistory(allHistory, pendingSession.startTime);
+      resetAfterSave();
+      renderMilestone();
     });
-
-    return record;
   }
 
-
-  function restoreHistory() {
-    chrome.storage.local.get(['floating_counter_history'], (result) => {
-      if (result.floating_counter_history) {
-        sessionHistory = result.floating_counter_history.split('=====\n').filter(s => s.trim().length > 0).map(s => s + '=====\n');
-        if (sessionHistory.length > 0) {
-          const lastRecord = sessionHistory[sessionHistory.length - 1];
-          document.getElementById('lastSessionInfo').innerHTML = recordToTable(lastRecord);
-        }
-      }
-    });
+  function buildSessionRecord(session, clientText, notesText) {
+    return [
+      `No. ${sessionIndex}`,
+      `Start: ${formatTimeWithMonthDay(session.startTime)}`,
+      `End: ${formatTimeWithMonthDay(session.endTime)}`,
+      `Units: ${session.units}`,
+      `Unit Length Minutes: ${session.unitLength}`,
+      `Active Minutes: ${session.activeMinutes}`,
+      `Paused Minutes: ${session.pausedMinutes}`,
+      `Client / Project ID: ${clientText}`,
+      `Notes: ${notesText}`,
+      '=====',
+      ''
+    ].join('\n');
   }
 
-  document.getElementById('viewHistoryButton').addEventListener('click', () => {
-    const historyArea = document.getElementById('historyArea');
-    if (historyArea.style.display === 'none') {
-      chrome.storage.local.get(['floating_counter_history'], (result) => {
-        const history = result.floating_counter_history || 'No Worklog History';
-        const records = history.split('=====').filter(s => s.trim().length > 0);
-        document.getElementById('historyDisplay').innerHTML = records.map(recordToTable).join('<hr/>');
+  function saveSessionRecord(record, callback) {
+    chrome.storage.local.get([STORAGE_KEYS.history], (result) => {
+      const currentHistory = result[STORAGE_KEYS.history] || '';
+      const allHistory = currentHistory + record;
+      chrome.storage.local.set({ [STORAGE_KEYS.history]: allHistory }, () => {
+        sessionHistory = parseHistory(allHistory);
+        sessionIndex = sessionHistory.length + 1;
+        callback(allHistory);
       });
-      historyArea.style.display = 'block';
-      document.getElementById('viewHistoryButton').innerText = '📜 Close All History';
-    } else {
-      historyArea.style.display = 'none';
-      document.getElementById('viewHistoryButton').innerText = '📜 Shou All History';
-    }
-  });
-
-  document.getElementById('clearHistoryButton').addEventListener('click', () => {
-    sessionHistory = [];
-    chrome.storage.local.remove(['floating_counter_history'], () => {
-      document.getElementById('historyDisplay').textContent = '';
-      document.getElementById('lastSessionInfo').textContent = '';
-      sessionIndex = 1; // 新增：清空时重置序号
     });
-  });
-
-  function formatDate(t) {
-    return `${t.getFullYear()}-${(t.getMonth()+1).toString().padStart(2,'0')}-${t.getDate().toString().padStart(2,'0')}`;
   }
 
-  confirmSaveButton.addEventListener('click', () => {
-    const endTime = new Date();
-    const clientText = clientInput.value.trim();
-    const notesText = notesInput.value.trim();
-    
-    const record = saveSession(startTime, endTime, unitCount, clientText, notesText);
-    updateLastSession(record);
+  function resetAfterSave() {
+    elements.clientInput.value = '';
+    elements.notesInput.value = '';
+    elements.modal.style.display = 'none';
+    elements.unitDisplay.textContent = 'Idle';
+    elements.unitDisplay.style.display = 'block';
+    elements.lastSessionTitle.textContent = 'Last Session';
+    elements.startStopButton.style.backgroundImage = `url('${iconURL}')`;
+    elements.startStopButton.classList.remove('is-paused');
+    elements.pauseResumeButton.disabled = true;
+    elements.pauseResumeButton.textContent = 'Pause';
+    timerState = timerTools.createTimerState(Date.now());
+    pendingSession = null;
+  }
 
-    // --- 修改这里：拼接所有历史记录 ---
-    chrome.storage.local.get(['floating_counter_history'], (result) => {
-        const allHistory = sessionHistory.join('');
-        const blob = new Blob([allHistory], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        chrome.downloads.download({
-            url: url,
-            filename: `${formatDate(startTime)}-billable-hour.txt`,
-            conflictAction: 'overwrite'
-        });
+  function renderLastSession(optionalRecord) {
+    const record = optionalRecord || sessionHistory[sessionHistory.length - 1];
+    elements.lastSessionTitle.textContent = 'Last Session';
+
+    if (!record) {
+      elements.lastSessionInfo.textContent = '';
+      return;
+    }
+
+    renderRecordTable(elements.lastSessionInfo, record);
+  }
+
+  function handleToggleHistory() {
+    if (elements.historyArea.style.display === 'none') {
+      renderHistory();
+      elements.historyArea.style.display = 'block';
+      elements.viewHistoryButton.textContent = 'Close All History';
+    } else {
+      elements.historyArea.style.display = 'none';
+      elements.viewHistoryButton.textContent = 'Show All Worklog';
+    }
+  }
+
+  function renderHistory() {
+    elements.historyDisplay.innerHTML = '';
+
+    if (sessionHistory.length === 0) {
+      elements.historyDisplay.textContent = 'No Worklog History';
+      return;
+    }
+
+    sessionHistory.forEach((record, index) => {
+      if (index > 0) elements.historyDisplay.appendChild(document.createElement('hr'));
+      elements.historyDisplay.appendChild(createRecordTable(record));
     });
-    // --- 结束修改 ---
+  }
 
-    // Reset modal and hide
-    clientInput.value = '';
-    notesInput.value = '';
-    modal.style.display = 'none';
+  function handleClearHistory() {
+    const shouldClear = window.confirm('Clean all saved worklog history? This cannot be undone.');
+    if (!shouldClear) return;
 
-    document.getElementById('unitDisplay').style.display = 'none';
-    showOverlay('End', { fontSize: '32px', fontWeight: '900' }); // 高亮大字
-    document.getElementById('unitDisplay').innerText = 'Idle'; // 新增：恢复Idle状态
-    document.getElementById('unitDisplay').style.display = 'block'; // 显示Idle
-    document.getElementById('lastSessionTitle').innerText = 'Last Session'; // 新增
-    startStopButton.style.backgroundImage = `url('${iconURL}')`; // 恢复待机图片
-});
+    sessionHistory = [];
+    chrome.storage.local.remove([STORAGE_KEYS.history], () => {
+      elements.historyDisplay.textContent = '';
+      elements.lastSessionInfo.textContent = '';
+      sessionIndex = 1;
+      renderMilestone();
+    });
+  }
 
-function showCurrentSessionTable(start, units) {
-  const startStr = formatTimeWithMonthDay(start);
-  const html = `
-    <table class="session-table current-session-table"><tbody>
-      <tr><td class="session-key start-key">Start</td><td class="session-value">${startStr}</td></tr>
-      <tr><td class="session-key end-key">End</td><td class="session-value"></td></tr>
-      <tr><td class="session-key">Units</td><td class="session-value">${units}</td></tr>
-    </tbody></table>
-  `;
-  document.getElementById('lastSessionInfo').innerHTML = html;
-  document.getElementById('lastSessionTitle').innerText = 'Current Session';
-}
+  function handleMilestoneChange() {
+    milestoneSettings = {
+      targetHours: elements.targetHoursInput.value.trim(),
+      startingHours: elements.startingHoursInput.value.trim()
+    };
+    chrome.storage.local.set({ [STORAGE_KEYS.milestone]: milestoneSettings });
+    renderMilestone();
+  }
 
+  function renderMilestone() {
+    const historyHours = milestoneTools.getHistoryHours(sessionHistory, unitLength);
+    const result = milestoneTools.calculateMilestone(
+      milestoneSettings.targetHours,
+      milestoneSettings.startingHours,
+      historyHours,
+      new Date()
+    );
+
+    elements.milestoneSummary.innerHTML = '';
+    appendMilestoneItem('Total progress', `${formatHours(result.total)} hrs (${Math.round(result.progress)}%)`);
+    appendMilestoneItem('Remaining hours', `${formatHours(result.remaining)} hrs`);
+    appendMilestoneItem('Weeks left', String(result.weeksLeft));
+    appendMilestoneItem('Needed per week', `${formatHours(result.neededPerWeek)} hrs`);
+
+    const feedback = document.createElement('div');
+    feedback.className = 'full';
+    feedback.textContent = result.message;
+    elements.milestoneSummary.appendChild(feedback);
+  }
+
+  function appendMilestoneItem(label, value) {
+    const item = document.createElement('div');
+    const strong = document.createElement('strong');
+    strong.textContent = label;
+    item.appendChild(strong);
+    item.appendChild(document.createElement('br'));
+    item.appendChild(document.createTextNode(value));
+    elements.milestoneSummary.appendChild(item);
+  }
+
+  function renderRecordTable(container, record) {
+    container.innerHTML = '';
+    container.appendChild(createRecordTable(record));
+  }
+
+  function createRecordTable(record) {
+    const rows = recordToRows(record);
+    const table = document.createElement('table');
+    table.className = 'session-table';
+    const body = document.createElement('tbody');
+
+    rows.forEach(([key, value]) => {
+      const tr = document.createElement('tr');
+      const keyCell = document.createElement('td');
+      const valueCell = document.createElement('td');
+      keyCell.className = getKeyClass(key);
+      valueCell.className = 'session-value';
+      keyCell.textContent = key;
+      valueCell.textContent = value;
+      tr.appendChild(keyCell);
+      tr.appendChild(valueCell);
+      body.appendChild(tr);
+    });
+
+    table.appendChild(body);
+    return table;
+  }
+
+  function renderTable(container, rows, isCurrent) {
+    const table = document.createElement('table');
+    table.className = `session-table${isCurrent ? ' current-session-table' : ''}`;
+    const body = document.createElement('tbody');
+
+    rows.forEach(([key, value]) => {
+      const tr = document.createElement('tr');
+      const keyCell = document.createElement('td');
+      const valueCell = document.createElement('td');
+      keyCell.className = getKeyClass(key);
+      valueCell.className = 'session-value';
+      keyCell.textContent = key;
+      valueCell.textContent = value;
+      tr.appendChild(keyCell);
+      tr.appendChild(valueCell);
+      body.appendChild(tr);
+    });
+
+    table.appendChild(body);
+    container.innerHTML = '';
+    container.appendChild(table);
+  }
+
+  function recordToRows(record) {
+    return record
+      .replace(/={2,}/g, '')
+      .trim()
+      .split('\n')
+      .map((line) => {
+        const [key, ...rest] = line.split(':');
+        return rest.length > 0 ? [key.trim(), rest.join(':').trim()] : null;
+      })
+      .filter(Boolean);
+  }
+
+  function getKeyClass(key) {
+    let className = 'session-key';
+    if (key === 'Start') className += ' start-key';
+    if (key === 'End') className += ' end-key';
+    return className;
+  }
+
+  function downloadHistory(allHistory, startTime) {
+    const blob = new Blob([allHistory], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    chrome.downloads.download({
+      url,
+      filename: `${formatDate(startTime)}-billable-hour.txt`,
+      conflictAction: 'overwrite'
+    }, () => {
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  function showOverlay(text, options = {}) {
+    elements.overlay.textContent = text;
+    elements.overlay.style.fontSize = options.fontSize || '18px';
+    elements.overlay.style.fontWeight = options.fontWeight || 'bold';
+    elements.overlay.style.opacity = '1';
+
+    setTimeout(() => {
+      elements.overlay.style.opacity = '0';
+      elements.overlay.style.fontSize = '18px';
+      elements.overlay.style.fontWeight = 'bold';
+    }, 800);
+  }
+
+  function parseHistory(historyText) {
+    return historyText
+      .split('=====\n')
+      .filter((record) => record.trim().length > 0)
+      .map((record) => `${record.trim()}\n=====\n`);
+  }
+
+  function clampUnitLength(value) {
+    let parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) parsed = 1;
+    if (parsed > 30) parsed = 30;
+    return parsed;
+  }
+
+  function formatTimeWithMonthDay(time) {
+    return `${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')} ${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}:${String(time.getSeconds()).padStart(2, '0')}`;
+  }
+
+  function formatDate(time) {
+    return `${time.getFullYear()}-${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')}`;
+  }
+
+  function formatHours(value) {
+    return milestoneTools.roundHours(value).toFixed(1);
+  }
+
+  window.addEventListener('beforeunload', () => {
+    stopTimerInterval();
+    if (clockInterval) clearInterval(clockInterval);
+  });
 })();
-
-
