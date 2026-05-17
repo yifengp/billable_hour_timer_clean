@@ -54,14 +54,8 @@
     return [0, 1, 2, 3, 4].map((offset) => addDays(weekStart, offset));
   }
 
-  function getEffectiveYearStart(now, startday) {
-    const yearStart = new Date(now.getFullYear(), 0, 1);
-    const parsedStartday = parseDateKey(startday);
-    if (!parsedStartday) return yearStart;
-
-    const startDate = fromDateKey(parsedStartday);
-    if (startDate.getFullYear() === now.getFullYear()) return startDate;
-    return yearStart;
+  function getEffectiveYearStart(now) {
+    return new Date(now.getFullYear(), 0, 1);
   }
 
   function getYearEnd(now) {
@@ -212,7 +206,7 @@
     };
 
     if (!existingPlan || existingPlan.weekKey !== weekKey) {
-      const effectiveYearStart = getEffectiveYearStart(context.now, context.startday);
+      const effectiveYearStart = getEffectiveYearStart(context.now);
       const planStart = new Date(Math.max(now.getTime(), effectiveYearStart.getTime()));
       const workdays = getWorkdaysBetween(planStart, addDays(getWeekStart(now), 4), { manualOffDates });
       plan.plannedHours = workdays.length * context.longTermDailyBaseHours;
@@ -257,7 +251,7 @@
     const now = startOfDay(context.now);
     const todayKey = toDateKey(now);
     const weekEnd = addDays(getWeekStart(now), 4);
-    const effectiveYearStart = getEffectiveYearStart(context.now, context.startday);
+    const effectiveYearStart = getEffectiveYearStart(context.now);
     const allocationStart = new Date(Math.max(now.getTime(), effectiveYearStart.getTime()));
     const manualOffDates = normalizeManualOffDates(plan.manualOffDates);
     const remainingDates = getWorkdaysBetween(allocationStart, weekEnd, { manualOffDates });
@@ -301,11 +295,10 @@
       const dateKey = toDateKey(date);
       const holidayName = getHolidayName(date);
       const isPast = compareDateKeys(dateKey, todayKey) < 0;
-      const isBeforeStart = context.effectiveYearStart && compareDateKeys(dateKey, context.effectiveYearStart) < 0;
       const isManualOff = manualOffDates.has(dateKey);
       const isHoliday = Boolean(holidayName);
       const isWeekendDate = isWeekend(date);
-      const isOff = isPast || isBeforeStart || isManualOff || isHoliday || isWeekendDate;
+      const isOff = isPast || isManualOff || isHoliday || isWeekendDate;
       const assignedHours = plan.assignedByDate?.[dateKey] || 0;
       const loggedHours = getLoggedHoursForDate(
         context.records,
@@ -321,21 +314,19 @@
         holidayName,
         isToday: dateKey === todayKey,
         isPast,
-        isBeforeStart,
         isManualOff,
         isHoliday,
         isOff,
         assignedHours,
         loggedHours,
         displayHours,
-        reason: getCardReason({ isPast, isBeforeStart, isManualOff, isHoliday, holidayName })
+        reason: getCardReason({ isPast, isManualOff, isHoliday, holidayName })
       };
     });
   }
 
   function getCardReason(card) {
     if (card.isPast) return 'Past';
-    if (card.isBeforeStart) return 'Before start';
     if (card.isManualOff) return 'Off';
     if (card.isHoliday) return card.holidayName || 'Holiday';
     return '';
@@ -343,7 +334,7 @@
 
   function buildQuarterSummaries(context) {
     const now = startOfDay(context.now);
-    const effectiveYearStart = getEffectiveYearStart(now, context.startday);
+    const effectiveYearStart = getEffectiveYearStart(now);
     const quarterTargetHours = context.target > 0 ? context.target / 4 : 0;
     const currentQuarterIndex = Math.floor(now.getMonth() / 3);
     const historyHours = getHistoryHours(context.records, context.fallbackUnitLength);
@@ -456,7 +447,7 @@
     const history = getHistoryHours(records, fallbackUnitLength);
     const total = starting;
     const annualRemainingHours = Math.max(0, target - total);
-    const effectiveYearStart = getEffectiveYearStart(now, settings.startday);
+    const effectiveYearStart = getEffectiveYearStart(now);
     const today = startOfDay(now);
     const yearEnd = getYearEnd(now);
     const remainingWorkdays = target > 0 && today.getTime() <= yearEnd.getTime()
@@ -470,7 +461,6 @@
       total,
       records,
       fallbackUnitLength,
-      startday: settings.startday,
       allocationMode: settings.allocationMode || 'auto',
       quarterAllocations: settings.quarterAllocations || [],
       effectiveYearStart: toDateKey(effectiveYearStart),

@@ -8,6 +8,7 @@ body {
   color: #000;
   font-family: "Courier New", monospace;
   text-align: center;
+  position: relative;
 }
 
 .pixel-font,
@@ -48,17 +49,9 @@ button {
   box-sizing: border-box;
 }
 
-#unitLengthControl {
-  margin: 10px auto 0 auto;
-  font-size: 12px;
-  color: #333;
-  width: 90%;
-}
-
 #unitLengthInput,
 #targetHoursInput,
 #startingHoursInput,
-#startdayInput,
 #allocationModeSelect,
 .customAllocationGrid input {
   font-size: 12px;
@@ -71,6 +64,32 @@ button {
 
 #unitLengthInput {
   width: 48px;
+}
+
+.unitLengthControl {
+  text-align: left;
+  color: #333;
+}
+
+.unitLengthControl label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.unitLengthField {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.unitLengthHint {
+  min-height: 13px;
+  margin-top: 6px;
+  color: #555;
+  font-size: 9px;
+  line-height: 1.25;
 }
 
 #startStopButton {
@@ -140,6 +159,36 @@ button:disabled {
   opacity: 0.45;
 }
 
+.iconMenuButton {
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  z-index: 20;
+  width: 32px;
+  height: 30px;
+  padding: 6px;
+  border-radius: 6px;
+  border-color: #d8e1ff;
+  background: #f4f7ff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.iconMenuButton span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: #222;
+  border-radius: 2px;
+}
+
+.iconMenuButton.is-open {
+  background: #e6ffe6;
+  border-color: #b7dfb7;
+}
+
 #pauseResumeButton {
   width: 52%;
   background-color: #f4f7ff;
@@ -154,6 +203,30 @@ button:disabled {
   padding: 10px;
   box-sizing: border-box;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.milestoneHomePanel {
+  padding-top: 8px;
+}
+
+.detailMenuPanel {
+  position: fixed;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 19;
+  width: min(380px, 90%);
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  border-radius: 8px;
+  background: rgba(226, 226, 215, 0.98);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
+  padding: 2px 0;
+}
+
+.detailPanel {
+  width: calc(100% - 16px);
+  margin: 8px auto;
 }
 
 .panelTitle {
@@ -171,6 +244,9 @@ button:disabled {
 .milestoneInputs label {
   font-size: 10px;
   line-height: 1.25;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .milestoneInputs input {
@@ -225,24 +301,6 @@ button:disabled {
   text-align: center;
 }
 
-.startdayField {
-  grid-column: 1 / -1;
-}
-
-.startdayControl {
-  display: grid;
-  grid-template-columns: 1fr 54px;
-  gap: 6px;
-  align-items: end;
-}
-
-#editStartdayButton {
-  width: 54px;
-  padding: 5px 4px;
-  border-color: #d8e1ff;
-  background: #f4f7ff;
-}
-
 .milestoneSummary {
   margin-top: 8px;
   display: grid;
@@ -263,6 +321,25 @@ button:disabled {
   text-align: center;
   font-weight: 700;
   background: #eef9ee;
+}
+
+.primaryMilestoneSummary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  text-align: left;
+}
+
+.primaryMilestoneSummary div {
+  border: 1px solid #2f6f3e;
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: #eef9ee;
+}
+
+.currentQuarterTitle {
+  margin-top: 10px;
+  margin-bottom: 5px;
 }
 
 .weekGrid {
@@ -317,6 +394,10 @@ button:disabled {
   grid-template-columns: 1fr 1fr;
   gap: 5px;
   text-align: left;
+}
+
+.currentQuarterSummary {
+  grid-template-columns: 1fr;
 }
 
 .quarterItem {

@@ -13,7 +13,10 @@
   const milestoneTools = window.BillableMilestone;
 
   const elements = {
+    detailMenuButton: document.getElementById('detailMenuButton'),
+    detailMenuPanel: document.getElementById('detailMenuPanel'),
     unitLengthInput: document.getElementById('unitLengthInput'),
+    unitLengthHint: document.getElementById('unitLengthHint'),
     dateLine: document.getElementById('dateLine'),
     currentTime: document.getElementById('currentTime'),
     unitDisplay: document.getElementById('unitDisplay'),
@@ -41,30 +44,31 @@
     q2AllocationInput: document.getElementById('q2AllocationInput'),
     q3AllocationInput: document.getElementById('q3AllocationInput'),
     q4AllocationInput: document.getElementById('q4AllocationInput'),
-    startdayInput: document.getElementById('startdayInput'),
-    editStartdayButton: document.getElementById('editStartdayButton'),
+    primaryMilestoneSummary: document.getElementById('primaryMilestoneSummary'),
     milestoneSummary: document.getElementById('milestoneSummary'),
     weekGrid: document.getElementById('weekGrid'),
-    quarterSummary: document.getElementById('quarterSummary')
+    currentQuarterSummary: document.getElementById('currentQuarterSummary'),
+    allQuarterSummary: document.getElementById('allQuarterSummary')
   };
 
   let timerInterval = null;
   let clockInterval = null;
   let timerState = timerTools.createTimerState(Date.now());
   let unitLength = 6;
+  let activeSessionUnitLength = null;
   let sessionHistory = [];
   let sessionIndex = 1;
   let pendingSession = null;
   let milestoneSettings = {
     targetHours: '',
     startingHours: '',
-    startday: '',
     confirmedGoalYear: null,
     allocationMode: 'auto',
     quarterAllocations: [0, 0, 0, 0]
   };
   let weekPlan = null;
   let lastMilestoneDateKey = '';
+  let isDetailMenuOpen = false;
 
   init();
 
@@ -76,6 +80,7 @@
   }
 
   function bindEvents() {
+    elements.detailMenuButton.addEventListener('click', handleDetailMenuToggle);
     elements.unitLengthInput.addEventListener('change', handleUnitLengthChange);
     elements.startStopButton.addEventListener('click', handleStartStopClick);
     elements.pauseResumeButton.addEventListener('click', handlePauseResumeClick);
@@ -89,8 +94,6 @@
     getQuarterAllocationInputs().forEach((input) => {
       input.addEventListener('change', handleMilestoneChange);
     });
-    elements.startdayInput.addEventListener('change', handleMilestoneChange);
-    elements.editStartdayButton.addEventListener('click', handleEditStartdayClick);
     elements.weekGrid.addEventListener('click', handleWeekGridClick);
   }
 
@@ -122,31 +125,56 @@
       sessionHistory = parseHistory(result[STORAGE_KEYS.history] || '');
       sessionIndex = sessionHistory.length + 1;
 
+      const legacyStartday = result[STORAGE_KEYS.milestone]?.startday;
       milestoneSettings = {
         targetHours: result[STORAGE_KEYS.milestone]?.targetHours ?? '',
         startingHours: result[STORAGE_KEYS.milestone]?.startingHours ?? '',
-        startday: result[STORAGE_KEYS.milestone]?.startday ?? '',
         confirmedGoalYear: result[STORAGE_KEYS.milestone]?.confirmedGoalYear ?? new Date().getFullYear(),
         allocationMode: result[STORAGE_KEYS.milestone]?.allocationMode ?? 'auto',
         quarterAllocations: normalizeQuarterAllocations(result[STORAGE_KEYS.milestone]?.quarterAllocations),
         autoAccumulatesHistory: result[STORAGE_KEYS.milestone]?.autoAccumulatesHistory === true
       };
       weekPlan = result[STORAGE_KEYS.weekPlan] || null;
+      if (legacyStartday) {
+        weekPlan = null;
+        chrome.storage.local.set({ [STORAGE_KEYS.milestone]: milestoneSettings });
+        chrome.storage.local.remove([STORAGE_KEYS.weekPlan]);
+      }
       migrateCompletedHoursIfNeeded();
       elements.targetHoursInput.value = milestoneSettings.targetHours;
       elements.startingHoursInput.value = milestoneSettings.startingHours;
-      elements.startdayInput.value = milestoneSettings.startday;
       elements.allocationModeSelect.value = milestoneSettings.allocationMode;
       setQuarterAllocationInputs(milestoneSettings.quarterAllocations);
       updateAllocationControls();
+      updateUnitLengthControls();
 
-      maybePromptForNewGoalYear();
+      maybeOpenSetupForNewGoalYear();
+      if (hasEmptyMilestoneSetup()) {
+        setDetailMenuOpen(true);
+      }
       renderLastSession();
       renderMilestone();
     });
   }
 
+  function handleDetailMenuToggle() {
+    setDetailMenuOpen(!isDetailMenuOpen);
+  }
+
+  function setDetailMenuOpen(isOpen) {
+    isDetailMenuOpen = isOpen;
+    elements.detailMenuPanel.style.display = isOpen ? 'block' : 'none';
+    elements.detailMenuButton.setAttribute('aria-expanded', String(isOpen));
+    elements.detailMenuButton.classList.toggle('is-open', isOpen);
+  }
+
   function handleUnitLengthChange(event) {
+    if (timerState.status !== 'idle' || pendingSession) {
+      elements.unitLengthInput.value = unitLength;
+      updateUnitLengthControls();
+      return;
+    }
+
     unitLength = clampUnitLength(event.target.value);
     elements.unitLengthInput.value = unitLength;
     chrome.storage.local.set({ [STORAGE_KEYS.unitLength]: unitLength });
@@ -168,6 +196,7 @@
   function startSession() {
     const now = new Date();
     timerState = timerTools.startTimerState(now);
+    activeSessionUnitLength = unitLength;
     pendingSession = null;
     startTimerInterval();
     showOverlay('Start!', { fontSize: '32px', fontWeight: '900' });
@@ -175,6 +204,7 @@
     elements.startStopButton.classList.remove('is-paused');
     elements.pauseResumeButton.disabled = false;
     elements.pauseResumeButton.textContent = 'Pause';
+    updateUnitLengthControls();
     renderCurrentSession();
   }
 
@@ -185,7 +215,8 @@
 
     const activeElapsedMs = timerTools.getActiveElapsedMs(timerState, now.getTime());
     const pausedElapsedMs = timerTools.getPausedElapsedMs(timerState, now.getTime());
-    const units = timerTools.getUnitCount(activeElapsedMs, unitLength);
+    const sessionUnitLength = getActiveUnitLength();
+    const units = timerTools.getUnitCount(activeElapsedMs, sessionUnitLength);
 
     pendingSession = {
       startTime: timerState.startTime,
@@ -193,7 +224,7 @@
       units,
       activeMinutes: timerTools.minutesFromMs(activeElapsedMs),
       pausedMinutes: timerTools.minutesFromMs(pausedElapsedMs),
-      unitLength
+      unitLength: sessionUnitLength
     };
 
     elements.pauseResumeButton.disabled = true;
@@ -202,6 +233,7 @@
     elements.startStopButton.classList.remove('is-paused');
     elements.modal.style.display = 'flex';
     showOverlay('End', { fontSize: '32px', fontWeight: '900' });
+    updateUnitLengthControls();
   }
 
   function handlePauseResumeClick() {
@@ -245,7 +277,7 @@
     const nowMs = Date.now();
     const activeMs = timerTools.getActiveElapsedMs(timerState, nowMs);
     const pausedMs = timerTools.getPausedElapsedMs(timerState, nowMs);
-    const units = timerTools.getUnitCount(activeMs, unitLength);
+    const units = timerTools.getUnitCount(activeMs, getActiveUnitLength());
     const label = timerState.status === 'paused' ? 'Paused' : 'Running';
 
     elements.unitDisplay.textContent = `${label}: ${units} Units`;
@@ -319,6 +351,8 @@
     elements.pauseResumeButton.textContent = 'Pause';
     timerState = timerTools.createTimerState(Date.now());
     pendingSession = null;
+    activeSessionUnitLength = null;
+    updateUnitLengthControls();
   }
 
   function renderLastSession(optionalRecord) {
@@ -377,7 +411,6 @@
     milestoneSettings = {
       targetHours: elements.targetHoursInput.value.trim(),
       startingHours: elements.startingHoursInput.value.trim(),
-      startday: elements.startdayInput.value.trim(),
       confirmedGoalYear: milestoneSettings.confirmedGoalYear || new Date().getFullYear(),
       allocationMode: elements.allocationModeSelect.value,
       quarterAllocations: getQuarterAllocationValues(),
@@ -396,19 +429,6 @@
     updateAllocationControls();
   }
 
-  function handleEditStartdayClick() {
-    if (elements.startdayInput.disabled) {
-      elements.startdayInput.disabled = false;
-      elements.editStartdayButton.textContent = 'Save';
-      elements.startdayInput.focus();
-      return;
-    }
-
-    elements.startdayInput.disabled = true;
-    elements.editStartdayButton.textContent = 'Edit';
-    handleMilestoneChange();
-  }
-
   function handleWeekGridClick(event) {
     const box = event.target.closest('.weekDayBox');
     if (!box) return;
@@ -422,18 +442,20 @@
     chrome.storage.local.set({ [STORAGE_KEYS.weekPlan]: weekPlan }, renderMilestone);
   }
 
-  function maybePromptForNewGoalYear() {
+  function maybeOpenSetupForNewGoalYear() {
     const currentYear = new Date().getFullYear();
     if ((milestoneSettings.confirmedGoalYear || currentYear) >= currentYear) return;
 
-    const shouldUpdate = window.confirm('A new year has started. Do you want to review your annual target hours?');
     milestoneSettings.confirmedGoalYear = currentYear;
     chrome.storage.local.set({ [STORAGE_KEYS.milestone]: milestoneSettings });
+    setDetailMenuOpen(true);
+    elements.targetHoursInput.focus();
+    elements.targetHoursInput.select();
+  }
 
-    if (shouldUpdate) {
-      elements.targetHoursInput.focus();
-      elements.targetHoursInput.select();
-    }
+  function hasEmptyMilestoneSetup() {
+    return !elements.targetHoursInput.value.trim()
+      || !elements.startingHoursInput.value.trim();
   }
 
   function renderMilestone() {
@@ -445,17 +467,19 @@
       chrome.storage.local.set({ [STORAGE_KEYS.weekPlan]: weekPlan });
     }
 
+    elements.primaryMilestoneSummary.innerHTML = '';
     elements.milestoneSummary.innerHTML = '';
     elements.weekGrid.innerHTML = '';
-    elements.quarterSummary.innerHTML = '';
+    elements.currentQuarterSummary.innerHTML = '';
+    elements.allQuarterSummary.innerHTML = '';
     lastMilestoneDateKey = milestoneTools.toDateKey(now);
 
-    appendMilestoneItem('Total progress', `${formatHours(result.total)} / ${formatHours(result.target)} hrs (${formatPercent(result.progress)})`);
-    appendMilestoneItem('Annual remaining', `${formatHours(result.annualRemainingHours)} hrs`);
-    appendMilestoneItem('Remaining workdays', String(result.remainingWorkdays));
-    appendMilestoneItem('Long-term daily base', `${formatHours(result.longTermDailyBaseHours)} hrs/day`);
-    appendMilestoneItem('Effective start', result.effectiveYearStart);
-    appendMilestoneItem('Week planned', `${formatHours(result.weekPlan.plannedHours || 0)} hrs`);
+    appendMilestoneItem(elements.primaryMilestoneSummary, 'Long-term daily base', `${formatHours(result.longTermDailyBaseHours)} hrs/day`);
+
+    appendMilestoneItem(elements.milestoneSummary, 'Total progress', `${formatHours(result.total)} / ${formatHours(result.target)} hrs (${formatPercent(result.progress)})`);
+    appendMilestoneItem(elements.milestoneSummary, 'Annual remaining', `${formatHours(result.annualRemainingHours)} hrs`);
+    appendMilestoneItem(elements.milestoneSummary, 'Remaining workdays', String(result.remainingWorkdays));
+    appendMilestoneItem(elements.milestoneSummary, 'Week planned', `${formatHours(result.weekPlan.plannedHours || 0)} hrs`);
 
     const feedback = document.createElement('div');
     feedback.className = 'full';
@@ -467,14 +491,14 @@
     updateAllocationControls();
   }
 
-  function appendMilestoneItem(label, value) {
+  function appendMilestoneItem(container, label, value) {
     const item = document.createElement('div');
     const strong = document.createElement('strong');
     strong.textContent = label;
     item.appendChild(strong);
     item.appendChild(document.createElement('br'));
     item.appendChild(document.createTextNode(value));
-    elements.milestoneSummary.appendChild(item);
+    container.appendChild(item);
   }
 
   function renderWeekGrid(cards) {
@@ -506,28 +530,37 @@
 
   function renderQuarterSummary(quarters) {
     quarters.forEach((quarter) => {
-      const item = document.createElement('div');
-      item.className = `quarterItem is-${quarter.status}`;
-      item.innerHTML = '';
+      const item = createQuarterItem(quarter);
+      elements.allQuarterSummary.appendChild(item);
 
-      const title = document.createElement('strong');
-      title.textContent = `${quarter.label} ${quarter.status}`;
-
-      const remaining = document.createElement('div');
-      remaining.textContent = `Remaining: ${formatHours(quarter.remainingHours)} hrs`;
-
-      const completed = document.createElement('div');
-      completed.textContent = `Completed: ${formatHours(quarter.loggedHours)} hrs`;
-
-      const workdays = document.createElement('div');
-      workdays.textContent = `Workdays: ${quarter.workdays}`;
-
-      item.appendChild(title);
-      item.appendChild(remaining);
-      item.appendChild(completed);
-      item.appendChild(workdays);
-      elements.quarterSummary.appendChild(item);
+      if (quarter.status === 'current') {
+        elements.currentQuarterSummary.appendChild(createQuarterItem(quarter));
+      }
     });
+  }
+
+  function createQuarterItem(quarter) {
+    const item = document.createElement('div');
+    item.className = `quarterItem is-${quarter.status}`;
+    item.innerHTML = '';
+
+    const title = document.createElement('strong');
+    title.textContent = `${quarter.label} ${quarter.status}`;
+
+    const remaining = document.createElement('div');
+    remaining.textContent = `Remaining: ${formatHours(quarter.remainingHours)} hrs`;
+
+    const completed = document.createElement('div');
+    completed.textContent = `Completed: ${formatHours(quarter.loggedHours)} hrs`;
+
+    const workdays = document.createElement('div');
+    workdays.textContent = `Workdays: ${quarter.workdays}`;
+
+    item.appendChild(title);
+    item.appendChild(remaining);
+    item.appendChild(completed);
+    item.appendChild(workdays);
+    return item;
   }
 
   function getMilestoneContext(now) {
@@ -542,7 +575,6 @@
       total,
       records: sessionHistory,
       fallbackUnitLength: unitLength,
-      startday: milestoneSettings.startday,
       allocationMode: milestoneSettings.allocationMode,
       quarterAllocations: milestoneSettings.quarterAllocations,
       longTermDailyBaseHours: preview.longTermDailyBaseHours
@@ -581,6 +613,16 @@
 
   function getSessionBillableHours(session) {
     return (session.units * session.unitLength) / 60;
+  }
+
+  function getActiveUnitLength() {
+    return activeSessionUnitLength || unitLength;
+  }
+
+  function updateUnitLengthControls() {
+    const isLocked = timerState.status !== 'idle' || Boolean(pendingSession);
+    elements.unitLengthInput.disabled = isLocked;
+    elements.unitLengthHint.textContent = isLocked ? 'Unit length can be changed after this session is saved.' : '';
   }
 
   function updateAllocationControls() {

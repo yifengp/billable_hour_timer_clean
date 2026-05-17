@@ -6,13 +6,13 @@
   <link rel="stylesheet" href="window-full.css" />
 </head>
 <body>
-  <div id="title" class="pixel-font">Billable Hour Machine!</div>
+  <button id="detailMenuButton" class="iconMenuButton" type="button" aria-label="Open details menu" aria-expanded="false">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
 
-  <div id="unitLengthControl" class="pixel-font-small">
-    Unit Length:
-    <input id="unitLengthInput" type="number" min="1" max="30" value="6" />
-    minutes
-  </div>
+  <div id="title" class="pixel-font">Billable Hour Machine!</div>
 
   <div id="dateLine" class="pixel-font">--</div>
   <div id="currentTime" class="pixel-font">--</div>
@@ -26,8 +26,30 @@
     <button id="pauseResumeButton" disabled>Pause</button>
   </div>
 
-  <section id="milestonePanel" class="panel">
-    <div class="panelTitle pixel-font-small">Annual Milestone</div>
+  <section id="milestonePanel" class="panel milestoneHomePanel">
+    <div id="primaryMilestoneSummary" class="primaryMilestoneSummary pixel-font-small"></div>
+    <div id="weekGrid" class="weekGrid pixel-font-small"></div>
+    <div class="panelTitle pixel-font-small currentQuarterTitle">Current Quarter</div>
+    <div id="currentQuarterSummary" class="quarterSummary currentQuarterSummary pixel-font-small"></div>
+  </section>
+
+  <aside id="detailMenuPanel" class="detailMenuPanel" aria-label="Milestone details" style="display:none;">
+    <section class="panel detailPanel">
+      <div class="panelTitle pixel-font-small">Timer Settings</div>
+      <div id="unitLengthControl" class="unitLengthControl pixel-font-small">
+        <label>
+          Unit Length
+          <span class="unitLengthField">
+            <input id="unitLengthInput" type="number" min="1" max="30" value="6" />
+            <span>minutes</span>
+          </span>
+        </label>
+        <div id="unitLengthHint" class="unitLengthHint"></div>
+      </div>
+    </section>
+
+    <section class="panel detailPanel">
+      <div class="panelTitle pixel-font-small">Annual Setup</div>
     <div class="milestoneInputs">
       <label>
         Target annual billable hours
@@ -58,18 +80,19 @@
           <label>Q4 <input id="q4AllocationInput" type="number" min="0" step="0.1" value="0" /></label>
         </div>
       </div>
-      <label class="startdayField">
-        Startday
-        <span class="startdayControl">
-          <input id="startdayInput" type="date" disabled />
-          <button id="editStartdayButton" type="button" aria-label="Edit startday">Edit</button>
-        </span>
-      </label>
     </div>
-    <div id="milestoneSummary" class="milestoneSummary pixel-font-small"></div>
-    <div id="weekGrid" class="weekGrid pixel-font-small"></div>
-    <div id="quarterSummary" class="quarterSummary pixel-font-small"></div>
-  </section>
+    </section>
+
+    <section class="panel detailPanel">
+      <div class="panelTitle pixel-font-small">Annual Details</div>
+      <div id="milestoneSummary" class="milestoneSummary pixel-font-small"></div>
+    </section>
+
+    <section class="panel detailPanel">
+      <div class="panelTitle pixel-font-small">All Quarters</div>
+      <div id="allQuarterSummary" class="quarterSummary pixel-font-small"></div>
+    </section>
+  </aside>
 
   <div id="lastSessionTitle" class="pixel-font-small">Last Session</div>
   <div id="lastSessionInfo" class="sessionBox pixel-font-small"></div>
