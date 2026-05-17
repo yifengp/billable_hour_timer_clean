@@ -57,7 +57,10 @@ button {
 
 #unitLengthInput,
 #targetHoursInput,
-#startingHoursInput {
+#startingHoursInput,
+#startdayInput,
+#allocationModeSelect,
+.customAllocationGrid input {
   font-size: 12px;
   padding: 4px 6px;
   border-radius: 4px;
@@ -175,6 +178,71 @@ button:disabled {
   margin-top: 4px;
 }
 
+.allocationHeader {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 74px;
+  gap: 8px;
+  align-items: center;
+  font-size: 10px;
+}
+
+#allocationToggleButton {
+  width: 74px;
+  padding: 5px 4px;
+  border-color: #d8e1ff;
+  background: #f4f7ff;
+}
+
+.allocationPanel {
+  grid-column: 1 / -1;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 7px;
+  background: #fbfbf6;
+}
+
+.allocationPanel select {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.allocationHint {
+  margin-top: 6px;
+  color: #555;
+  font-size: 9px;
+  line-height: 1.25;
+}
+
+.customAllocationGrid {
+  margin-top: 7px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+
+.customAllocationGrid label {
+  text-align: center;
+}
+
+.startdayField {
+  grid-column: 1 / -1;
+}
+
+.startdayControl {
+  display: grid;
+  grid-template-columns: 1fr 54px;
+  gap: 6px;
+  align-items: end;
+}
+
+#editStartdayButton {
+  width: 54px;
+  padding: 5px 4px;
+  border-color: #d8e1ff;
+  background: #f4f7ff;
+}
+
 .milestoneSummary {
   margin-top: 8px;
   display: grid;
@@ -195,6 +263,77 @@ button:disabled {
   text-align: center;
   font-weight: 700;
   background: #eef9ee;
+}
+
+.weekGrid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.weekDayBox {
+  min-height: 54px;
+  border: 1px solid #d0d0c8;
+  border-radius: 6px;
+  background: #fbfbf6;
+  padding: 5px 2px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.weekDayBox.is-today {
+  border-color: #2f6f3e;
+  background: #eef9ee;
+}
+
+.weekDayBox.is-off {
+  color: #777;
+  background: #f0f0ec;
+}
+
+.weekDayLabel {
+  font-weight: 700;
+}
+
+.weekDayValue {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.weekDayReason {
+  min-height: 12px;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.quarterSummary {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  text-align: left;
+}
+
+.quarterItem {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fbfbf6;
+  padding: 5px;
+}
+
+.quarterItem.is-current {
+  border-color: #2f6f3e;
+  background: #eef9ee;
+}
+
+.quarterItem.is-inactive {
+  color: #777;
+  background: #f0f0ec;
 }
 
 #lastSessionTitle {

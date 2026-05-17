@@ -37,8 +37,38 @@
         Current completed hours
         <input id="startingHoursInput" type="number" min="0" step="0.1" placeholder="0" />
       </label>
+      <div class="allocationHeader">
+        <span>Existing hours allocation</span>
+        <button id="allocationToggleButton" type="button">Allocate</button>
+      </div>
+      <div id="allocationPanel" class="allocationPanel" style="display:none;">
+        <label>
+          Mode
+          <select id="allocationModeSelect">
+            <option value="auto">Auto oldest first</option>
+            <option value="current">All current quarter</option>
+            <option value="custom">Custom split</option>
+          </select>
+        </label>
+        <div id="allocationHint" class="allocationHint"></div>
+        <div id="customAllocationGrid" class="customAllocationGrid" style="display:none;">
+          <label>Q1 <input id="q1AllocationInput" type="number" min="0" step="0.1" value="0" /></label>
+          <label>Q2 <input id="q2AllocationInput" type="number" min="0" step="0.1" value="0" /></label>
+          <label>Q3 <input id="q3AllocationInput" type="number" min="0" step="0.1" value="0" /></label>
+          <label>Q4 <input id="q4AllocationInput" type="number" min="0" step="0.1" value="0" /></label>
+        </div>
+      </div>
+      <label class="startdayField">
+        Startday
+        <span class="startdayControl">
+          <input id="startdayInput" type="date" disabled />
+          <button id="editStartdayButton" type="button" aria-label="Edit startday">Edit</button>
+        </span>
+      </label>
     </div>
     <div id="milestoneSummary" class="milestoneSummary pixel-font-small"></div>
+    <div id="weekGrid" class="weekGrid pixel-font-small"></div>
+    <div id="quarterSummary" class="quarterSummary pixel-font-small"></div>
   </section>
 
   <div id="lastSessionTitle" class="pixel-font-small">Last Session</div>
