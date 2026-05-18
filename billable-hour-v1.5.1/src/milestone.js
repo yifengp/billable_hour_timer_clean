@@ -1,5 +1,6 @@
 (function() {
   const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const HOURS_EPSILON = 0.0001;
 
   function parseHours(value) {
     const parsed = Number.parseFloat(value);
@@ -188,6 +189,7 @@
     const now = startOfDay(context.now);
     const todayKey = toDateKey(now);
     const weekKey = getWeekKey(now);
+    const dailyBaseHours = getWeekDailyBaseHours(context);
     const manualOffDates = normalizeManualOffDates(
       existingPlan && existingPlan.weekKey === weekKey ? existingPlan.manualOffDates : []
     );
@@ -199,21 +201,22 @@
     } : {
       weekKey,
       plannedHours: 0,
-      dailyBaseHours: context.longTermDailyBaseHours,
+      dailyBaseHours,
       assignedByDate: {},
       manualOffDates,
       lastAllocatedDate: ''
     };
 
-    if (!existingPlan || existingPlan.weekKey !== weekKey) {
+    if (!existingPlan || existingPlan.weekKey !== weekKey || hasWeekDailyBaseChanged(plan, dailyBaseHours)) {
       const effectiveYearStart = getEffectiveYearStart(context.now);
       const planStart = new Date(Math.max(now.getTime(), effectiveYearStart.getTime()));
       const workdays = getWorkdaysBetween(planStart, addDays(getWeekStart(now), 4), { manualOffDates });
-      plan.plannedHours = workdays.length * context.longTermDailyBaseHours;
-      plan.dailyBaseHours = context.longTermDailyBaseHours;
+      plan.plannedHours = workdays.length * dailyBaseHours;
+      plan.dailyBaseHours = dailyBaseHours;
       plan.assignedByDate = {};
+      plan.lastAllocatedDate = '';
       workdays.forEach((date) => {
-        plan.assignedByDate[toDateKey(date)] = context.longTermDailyBaseHours;
+        plan.assignedByDate[toDateKey(date)] = dailyBaseHours;
       });
     }
 
@@ -222,6 +225,16 @@
     }
 
     return plan;
+  }
+
+  function getWeekDailyBaseHours(context) {
+    return Number.isFinite(context.currentQuarterDailyBaseHours)
+      ? context.currentQuarterDailyBaseHours
+      : context.longTermDailyBaseHours;
+  }
+
+  function hasWeekDailyBaseChanged(plan, dailyBaseHours) {
+    return Math.abs((plan.dailyBaseHours || 0) - dailyBaseHours) > HOURS_EPSILON;
   }
 
   function toggleManualOffDate(plan, dateKey, context) {
@@ -397,6 +410,12 @@
     });
   }
 
+  function getCurrentQuarterDailyBaseHours(quarters) {
+    const currentQuarter = quarters.find((quarter) => quarter.status === 'current');
+    if (!currentQuarter || currentQuarter.workdays <= 0) return 0;
+    return Math.max(0, currentQuarter.remainingHours) / currentQuarter.workdays;
+  }
+
   function getQuarterLoggedHours(context, quarterStart, quarterEnd, quarterIndex, untrackedAllocations) {
     const recordHours = getLoggedHoursBetween(
       context.records,
@@ -467,6 +486,8 @@
       longTermDailyBaseHours,
       manualOffDates: normalizeManualOffDates(weekPlan?.manualOffDates)
     };
+    const quarters = buildQuarterSummaries(context);
+    context.currentQuarterDailyBaseHours = getCurrentQuarterDailyBaseHours(quarters);
     const ensuredWeekPlan = createOrUpdateWeekPlan(weekPlan, context);
     context.manualOffDates = normalizeManualOffDates(ensuredWeekPlan.manualOffDates);
 
@@ -480,9 +501,10 @@
       longTermDailyBaseHours,
       progress,
       effectiveYearStart: toDateKey(effectiveYearStart),
+      currentQuarterDailyBaseHours: context.currentQuarterDailyBaseHours,
       weekPlan: ensuredWeekPlan,
       weekCards: buildWeekCards(ensuredWeekPlan, context),
-      quarters: buildQuarterSummaries(context),
+      quarters,
       message: getFeedbackMessage(target, total, longTermDailyBaseHours)
     };
   }

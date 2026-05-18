@@ -577,7 +577,8 @@
       fallbackUnitLength: unitLength,
       allocationMode: milestoneSettings.allocationMode,
       quarterAllocations: milestoneSettings.quarterAllocations,
-      longTermDailyBaseHours: preview.longTermDailyBaseHours
+      longTermDailyBaseHours: preview.longTermDailyBaseHours,
+      currentQuarterDailyBaseHours: preview.currentQuarterDailyBaseHours
     };
   }
 
